@@ -6,5 +6,6 @@ members = [
 "three",
     "four",
 "five",
-    "six"
+    "six",
+"seven"
 ]
