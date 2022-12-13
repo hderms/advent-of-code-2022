@@ -19,37 +19,34 @@ fn main() -> Result<()> {
     let file = File::open("./nine/input.txt")?;
     let reader = BufReader::new(file);
     let mut rope = Rope::new();
+    let mut long_rope = LongRope::new(10);
     let mut track_distinct = HashSet::new();
+    let mut track_distinct_long = HashSet::new();
     track_distinct.insert(rope.tail);
+    track_distinct_long.insert(long_rope.tail());
 
     for line in reader.lines() {
         let line = line?;
         let instruction: Instruction = line.parse()?;
         for _ in 0..instruction.count {
             rope = rope.compute_next(&instruction.direction);
+            long_rope = long_rope.compute_next(&instruction.direction);
             track_distinct.insert(rope.tail);
+            track_distinct_long.insert(long_rope.tail());
         }
     }
-    let distinct_spaces = track_distinct.len();
-    println!("part one: {}", distinct_spaces);
+    println!("part one: {}", track_distinct.len());
+    println!("part two: {}", track_distinct_long.len());
     Ok(())
 }
 
-struct Rope {
-    head: Point,
-    tail: Point,
-}
+#[derive(Copy, Clone, Eq, Hash, PartialEq)]
+struct Knot(Point);
 
-impl Rope {
-    fn new() -> Rope {
-        Rope {
-            head: (0, 0),
-            tail: (0, 0),
-        }
-    }
-    fn compute_next(self, direction: &Direction) -> Rope {
-        let (head_x, head_y) = self.head;
-        let new_head: Point = match direction {
+impl Knot {
+    fn shift(&self, direction: &Direction) -> Knot {
+        let (head_x, head_y) = self.0;
+         let new_point = match direction {
             Direction::Up => {
                 (head_x, head_y + 1)
             }
@@ -63,12 +60,69 @@ impl Rope {
                 (head_x + 1, head_y)
             }
         };
+        Knot(new_point)
+    }
 
-        let new_tail = compute_tail(&new_head, &self.tail);
+    fn compute_next(head: Knot, tail: Knot, direction: &Direction) -> (Knot, Knot) {
+        let new_head = head.shift(direction);
 
+        let new_tail = compute_tail(&new_head.0, &tail.0);
+
+        (new_head, Knot(new_tail))
+    }
+}
+
+struct LongRope {
+    knots: Vec<Knot>,
+}
+impl LongRope {
+    fn new(size: usize) -> LongRope {
+        assert!(size > 2, "can't instantiate a long rope with less than 2 elements");
+        let knots = vec![Knot((0i32, 0i32)); size];
+        LongRope {
+            knots
+        }
+    }
+    fn head(&self) -> Knot {
+        self.knots.first().expect("LongRope should always have a head").clone()
+    }
+
+    fn tail(&self) -> Knot {
+        self.knots.last().expect("LongRope should always have a tail").clone()
+    }
+
+    fn compute_next(&self, direction: &Direction) -> LongRope {
+
+        let new_head = self.head().shift(direction);
+        let mut new_elements = Vec::with_capacity(self.knots.len());
+        let mut previous = new_head;
+        for tail in &self.knots[1..] {
+            let new_tail = compute_tail(&previous.0, &tail.0);
+            new_elements.push(previous);
+            previous = Knot(new_tail);
+        }
+        new_elements.push(previous);
+        LongRope{knots: new_elements}
+    }
+}
+
+struct Rope {
+    head: Knot,
+    tail: Knot,
+}
+
+impl Rope {
+    fn compute_next(&self, direction: &Direction) -> Rope {
+        let (new_head, new_tail) = Knot::compute_next(self.head, self.tail, direction);
+        Rope { head: new_head, tail: new_tail }
+    }
+}
+
+impl Rope {
+    fn new() -> Rope {
         Rope {
-            head: new_head,
-            tail: new_tail,
+            head: Knot((0, 0)),
+            tail: Knot((0, 0)),
         }
     }
 }
