@@ -18,11 +18,11 @@ type Point = (i32, i32);
 fn main() -> Result<()> {
     let file = File::open("./nine/input.txt")?;
     let reader = BufReader::new(file);
-    let mut rope = Rope::new();
+    let mut rope = LongRope::new(2);
     let mut long_rope = LongRope::new(10);
     let mut track_distinct = HashSet::new();
     let mut track_distinct_long = HashSet::new();
-    track_distinct.insert(rope.tail);
+    track_distinct.insert(rope.tail());
     track_distinct_long.insert(long_rope.tail());
 
     for line in reader.lines() {
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
         for _ in 0..instruction.count {
             rope = rope.compute_next(&instruction.direction);
             long_rope = long_rope.compute_next(&instruction.direction);
-            track_distinct.insert(rope.tail);
+            track_distinct.insert(rope.tail());
             track_distinct_long.insert(long_rope.tail());
         }
     }
@@ -44,9 +44,10 @@ fn main() -> Result<()> {
 struct Knot(Point);
 
 impl Knot {
+    /// shifts a knot in a direction
     fn shift(&self, direction: &Direction) -> Knot {
         let (head_x, head_y) = self.0;
-         let new_point = match direction {
+        let new_point = match direction {
             Direction::Up => {
                 (head_x, head_y + 1)
             }
@@ -62,22 +63,15 @@ impl Knot {
         };
         Knot(new_point)
     }
-
-    fn compute_next(head: Knot, tail: Knot, direction: &Direction) -> (Knot, Knot) {
-        let new_head = head.shift(direction);
-
-        let new_tail = compute_tail(&new_head.0, &tail.0);
-
-        (new_head, Knot(new_tail))
-    }
 }
 
 struct LongRope {
     knots: Vec<Knot>,
 }
+
 impl LongRope {
     fn new(size: usize) -> LongRope {
-        assert!(size > 2, "can't instantiate a long rope with less than 2 elements");
+        assert!(size >= 2, "can't instantiate a long rope with less than 2 elements");
         let knots = vec![Knot((0i32, 0i32)); size];
         LongRope {
             knots
@@ -91,42 +85,24 @@ impl LongRope {
         self.knots.last().expect("LongRope should always have a tail").clone()
     }
 
+    ///computes the new positions of all knots based on the head being moved a direction
     fn compute_next(&self, direction: &Direction) -> LongRope {
-
         let new_head = self.head().shift(direction);
         let mut new_elements = Vec::with_capacity(self.knots.len());
         let mut previous = new_head;
+
         for tail in &self.knots[1..] {
             let new_tail = compute_tail(&previous.0, &tail.0);
             new_elements.push(previous);
             previous = Knot(new_tail);
         }
+
         new_elements.push(previous);
-        LongRope{knots: new_elements}
+        LongRope { knots: new_elements }
     }
 }
 
-struct Rope {
-    head: Knot,
-    tail: Knot,
-}
-
-impl Rope {
-    fn compute_next(&self, direction: &Direction) -> Rope {
-        let (new_head, new_tail) = Knot::compute_next(self.head, self.tail, direction);
-        Rope { head: new_head, tail: new_tail }
-    }
-}
-
-impl Rope {
-    fn new() -> Rope {
-        Rope {
-            head: Knot((0, 0)),
-            tail: Knot((0, 0)),
-        }
-    }
-}
-
+///Computes the tail given the new position of the element in front of it and its old position
 fn compute_tail(new_head: &Point, old_tail: &Point) -> Point {
     let ((head_x, head_y), (tail_x, tail_y)) = (new_head, old_tail);
 
@@ -143,10 +119,12 @@ fn compute_tail(new_head: &Point, old_tail: &Point) -> Point {
     }
 }
 
+///Are two points touching i.e. overlapping; diagonally, vertically or horizontally adjacent
 fn touching(x_delta: i32, y_delta: i32) -> bool {
     x_delta.abs() <= 1 && y_delta.abs() <= 1
 }
 
+///clamps a signed number to be within -1 and 1
 fn clamp_int_sign(delta: i32) -> i32 {
     min(max(-1, delta), 1)
 }
